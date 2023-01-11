@@ -9,6 +9,7 @@
 #include "King.h"
 #include "Piece.h"
 #include "Queen.h"
+#include "Opponent.h"
 
 
 class Game
@@ -38,11 +39,20 @@ public:
 	// light up the possible Moves
 	void renderPossibleMoves(Piece* piece);
 
+	void GetField(Piece* field[8][8]);
+
+
+	Opponent* GetOpponent()
+	{
+		return m_Opponent;
+	}
+
 	// undos the renderPossibleMoves function
 	void undoRenderPossibleMoves(Piece* piece);
-
+	bool isCheckmate();
 
 private:
+	Opponent* m_Opponent;
 	// 2D Field array, every Position has got a PIece::Team and a piece
 	Piece* m_field[8][8];
 
@@ -75,6 +85,7 @@ private:
 
 	// checks current game state, determines winner or remis
 	void gameState();
+
 
 	// every single piece
 	Pawn* pl1;

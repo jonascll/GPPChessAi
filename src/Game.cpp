@@ -36,7 +36,9 @@ Game::Game(SDL_Handler* handler)
 	  ql1(new Queen(Piece::WHITE, std::pair<int, int>(4, 0), handler)),
 	  m_turn(Piece::WHITE),
 	  m_handler(handler),
-	  m_checkEnPassant(true)
+	  m_checkEnPassant(true),
+	  m_Opponent{new Opponent{this, handler}}
+
 {
 	m_field[0][7] = rb1;
 	m_field[7][7] = rb2;
@@ -409,6 +411,54 @@ void Game::gameState()
 }
 
 
+bool Game::isCheckmate()
+{
+	bool lost = true;
+	King* pivot = kb1;
+
+	if (m_turn == Piece::BLACK)
+	{
+		pivot = kl1;
+	}
+
+	pivot->setCheck(m_field, kl1->getPos().first, kl1->getPos().second);
+	for (int i = 0; i < 8; i++)
+	{
+		for (int j = 0; j < 8; j++)
+		{
+			if (m_field[i][j] != nullptr)
+			{
+				if (m_field[i][j]->getTeam() != m_turn)
+				{
+					m_field[i][j]->calcPossibleMoves(m_field, true);
+					if (!m_field[i][j]->getPossibleMoves().empty())
+					{
+						lost = false;
+					}
+				}
+			}
+		}
+	}
+
+	if (pivot->getCheck() && lost)
+	{
+		return lost;
+	}
+	else if (lost)
+	{
+		if (m_turn == Piece::BLACK)
+		{
+			return false;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	return lost;
+}
+
 void Game::disableEnPassant()
 {
 	for (int i = 0; i < 8; i++)
@@ -461,6 +511,17 @@ void Game::renderPossibleMoves(Piece* piece)
 					m_field[i][j]->render();
 				}
 			}
+		}
+	}
+}
+
+void Game::GetField(Piece* field[8][8])
+{
+	for (int i{}; i <= 8; ++i)
+	{
+		for (int j{}; j <= 8; ++j)
+		{
+			field[i][j] = m_field[i][j];
 		}
 	}
 }

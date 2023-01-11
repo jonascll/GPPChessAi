@@ -1,6 +1,9 @@
 #include "Opponent.h"
 
+#include <iostream>
+
 #include "Game.h"
+
 
 int Opponent::Evaluate(Piece* field[8][8], SDL_Handler* handler, Game* game)
 {
@@ -56,13 +59,19 @@ int Opponent::CountPiecesValue(Piece* field[8][8], Piece::Team teamToCount)
 	return value;
 }
 
-int Opponent::SearchBestMove(int depth, Piece* field[8][8], SDL_Handler* handler, Game* game)
+Opponent::Opponent(Game* game, SDL_Handler* handler) :
+	m_Game{game}, m_Handler{handler}
+{
+	game->GetField(m_Field);
+}
+
+int Opponent::SearchBestMove(int depth, Piece* field[8][8], SDL_Handler* handler, Game* game, int alpha, int beta)
 {
 	if (depth == 0)
 	{
 		return Evaluate(field, handler, game);
 	}
-	std::vector<std::pair<std::pair<int, int>, std::tuple<int, int, Piece::MoveType>>> allPossibleMoves{};
+	std::vector<Move> allPossibleMoves{};
 	for (int i{}; i < 8; ++i)
 	{
 		for (int j{}; j < 8; ++j)
@@ -74,38 +83,69 @@ int Opponent::SearchBestMove(int depth, Piece* field[8][8], SDL_Handler* handler
 				std::vector<std::tuple<int, int, Piece::MoveType>> allMovesForThisPiece = piece->getPossibleMoves();
 				for (int k{}; k < allMovesForThisPiece.size(); ++k)
 				{
-					std::pair<std::pair<int, int>, std::tuple<int, int, Piece::MoveType>> move =
-						std::make_pair(piece->getPos(), allMovesForThisPiece[k]);
+					Move move{0, piece->getPos(), allMovesForThisPiece[k]};
+					move.piece = field[i][j];
+
 					allPossibleMoves.push_back(move);
 				}
 			}
 		}
 	}
+	if (allPossibleMoves.empty())
+	{
+		if (game->isCheckmate())
+		{
+			return -1000000;
+		}
+		return 0;
+	}
+
 	for (int i{}; i < allPossibleMoves.size(); ++i)
 	{
 		MakeMove(field, allPossibleMoves[i], handler, game);
-		SearchBestMove(depth - 1, field, handler, game);
+		int evaluation = -SearchBestMove(depth - 1, field, handler, game, -beta, -alpha);
 		UndoMove(field, allPossibleMoves[i], handler, game);
+		if (evaluation >= beta)
+		{
+			return beta;
+		}
+
+		if (evaluation > alpha)
+		{
+			alpha = evaluation;
+			m_BestMove.piece = allPossibleMoves[i].piece;
+			m_BestMove.evaluation = alpha;
+			m_BestMove.StartPos = allPossibleMoves[i].StartPos;
+			m_BestMove.MoveTuple = allPossibleMoves[i].MoveTuple;
+		}
 	}
+
+	return alpha;
 }
 
+Move Opponent::GetBestMove()
+{
+	return m_BestMove;
+}
+
+
 void Opponent::MakeMove(Piece* field[8][8],
-                        std::pair<std::pair<int, int>, std::tuple<int, int, Piece::MoveType>> move,
+                        Move move,
                         SDL_Handler* handler, Game* game)
 {
-	int startX{std::get<0>(std::get<0>(move))};
-	int startY{std::get<1>(std::get<0>(move))};
-	int endX{std::get<0>(std::get<1>(move))};
-	int endY{std::get<1>(std::get<1>(move))};
+	int startX{move.StartPos.first};
+	int startY{move.StartPos.second};
+	int endX{std::get<0>(move.MoveTuple)};
+	int endY{std::get<1>(move.MoveTuple)};
 	Pawn* pawn_start;
 	Pawn* pwn;
-	switch (std::get<2>(std::get<1>(move)))
+	switch (std::get<2>(move.MoveTuple))
 	{
 	case Piece::NORMAL:
 
 		field[endX][endY] = field[startX][startY];
 		field[endX][endY]->m_hasMoved = true;
-		field[startX][startY] = nullptr;
+	/*field[startX][startY] = nullptr;*/
 
 		field[endX][endY]->setPosition(std::pair<int, int>(endX, endY));
 
@@ -149,8 +189,8 @@ void Opponent::MakeMove(Piece* field[8][8],
 			field[3][endY]->m_hasMoved = true;
 			field[2][endY]->setPosition(std::pair<int, int>(2, endY));
 			field[3][endY]->setPosition(std::pair<int, int>(3, endY));
-			field[4][endY] = nullptr;
-			field[0][endY] = nullptr;
+			/*	field[4][endY] = nullptr;
+				field[0][endY] = nullptr;*/
 		}
 		else
 		{
@@ -160,8 +200,8 @@ void Opponent::MakeMove(Piece* field[8][8],
 			field[5][endY]->m_hasMoved = true;
 			field[6][endY]->setPosition(std::pair<int, int>(6, endY));
 			field[5][endY]->setPosition(std::pair<int, int>(5, endY));
-			field[4][endY] = nullptr;
-			field[7][endY] = nullptr;
+			/*field[4][endY] = nullptr;
+			field[7][endY] = nullptr;*/
 		}
 
 
@@ -184,20 +224,22 @@ void Opponent::MakeMove(Piece* field[8][8],
 		field[endX][endY]->m_hasMoved = true;
 		field[startX][startY] = nullptr;
 		break;
+	case Piece::INIT: break;
+	default: ;
 	}
 }
 
 void Opponent::UndoMove(Piece* field[8][8],
-                        std::pair<std::pair<int, int>, std::tuple<int, int, Piece::MoveType>> move,
+                        Move move,
                         SDL_Handler* handler, Game* game)
 {
-	int startX{std::get<0>(std::get<0>(move))};
-	int startY{std::get<1>(std::get<0>(move))};
-	int endX{std::get<0>(std::get<1>(move))};
-	int endY{std::get<1>(std::get<1>(move))};
+	int startX{move.StartPos.first};
+	int startY{move.StartPos.second};
+	int endX{std::get<0>(move.MoveTuple)};
+	int endY{std::get<1>(move.MoveTuple)};
 	Pawn* pawn_start;
 	Pawn* pwn;
-	switch (std::get<1>(move.second))
+	switch (std::get<2>(move.MoveTuple))
 	{
 	case Piece::NORMAL:
 
@@ -208,10 +250,6 @@ void Opponent::UndoMove(Piece* field[8][8],
 		field[startX][startY]->setPosition(std::pair<int, int>(startX, startY));
 
 
-		pwn = static_cast<Pawn*>(field[endX - 1][endY]);
-		pwn->setEnPassant(std::pair<bool, int>(false, -1));
-		pwn = static_cast<Pawn*>(field[endX + 1][endY]);
-		pwn->setEnPassant(std::pair<bool, int>(false, 1));
 		break;
 	case Piece::CASTLE:
 		if (endX == 0)
@@ -222,8 +260,8 @@ void Opponent::UndoMove(Piece* field[8][8],
 			field[0][endY]->m_hasMoved = false;
 			field[4][endY]->setPosition(std::pair<int, int>(4, endY));
 			field[0][endY]->setPosition(std::pair<int, int>(0, endY));
-			field[2][endY] = nullptr;
-			field[3][endY] = nullptr;
+			/*field[2][endY] = nullptr;
+			field[3][endY] = nullptr;*/
 		}
 		else
 		{
@@ -233,8 +271,8 @@ void Opponent::UndoMove(Piece* field[8][8],
 			field[7][endY]->m_hasMoved = false;
 			field[4][endY]->setPosition(std::pair<int, int>(4, endY));
 			field[7][endY]->setPosition(std::pair<int, int>(7, endY));
-			field[6][endY] = nullptr;
-			field[5][endY] = nullptr;
+			/*	field[6][endY] = nullptr;
+				field[5][endY] = nullptr;*/
 		}
 
 
@@ -257,7 +295,7 @@ void Opponent::UndoMove(Piece* field[8][8],
 
 		field[startX][startY] = field[endX][endY];
 		field[startX][startY]->m_hasMoved = false;
-		field[endX][endY] = nullptr;
+	/*field[endX][endY] = nullptr;*/
 
 		field[startX][startY]->setPosition(std::pair<int, int>(startX, startY));
 
@@ -267,7 +305,7 @@ void Opponent::UndoMove(Piece* field[8][8],
 		field[startX][startY] = new Pawn{game->getTurn(), std::pair<int, int>(startX, startY), handler};
 		field[startX][startY]->setPosition(std::make_pair(startX, startY));
 		field[startX][startY]->m_hasMoved = false;
-		field[endX][endY] = nullptr;
+	/*field[endX][endY] = nullptr;*/
 		break;
 	}
 }
