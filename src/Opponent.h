@@ -8,16 +8,19 @@ class Opponent
 public:
 	Opponent();
 private:
-	int Evaluate(Piece* field[8][8], Game* game);
+	int Evaluate(Piece* field[8][8], SDL_Handler* handler, Game* game);
 
 	int CountPiecesValue(Piece* field[8][8], Piece::Team teamToCount);
 
-	int SearchBestMove(int depth, Piece* field[8][8], Game* game);
+	int SearchBestMove(int depth, Piece* field[8][8], SDL_Handler* handler, Game* game);
 
 	void MakeMove(Piece* field[8][8],
-	              std::pair<std::pair<int, int>, std::vector<std::tuple<int, int, Piece::MoveType>>> move);
+	              std::pair<std::pair<int, int>, std::tuple<int, int, Piece::MoveType>> move,
+	              SDL_Handler* handler, Game* game);
 	void UndoMove(Piece* field[8][8],
-	              std::pair<std::pair<int, int>, std::vector<std::tuple<int, int, Piece::MoveType>>> move);
+	              std::pair<std::pair<int, int>, std::tuple<int, int, Piece::MoveType>> move,
+	              SDL_Handler* handler, Game* game);
+
 
 	int m_ValuePawn = 10;
 	int m_ValueBishop = 30;
